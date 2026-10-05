@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>しらす式 キングダム覇道 完凸シュミレーター</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b0f14;color:#f3f6fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}
+main{max-width:760px;margin:auto;padding:18px 14px 50px}h1{text-align:center;color:#e8b84a;font-size:24px;margin:8px 0}p.sub{text-align:center;color:#9da8b5;font-size:13px}
+.card{background:#151b23;border:1px solid #303a46;border-radius:16px;padding:16px;margin:12px 0}h2{font-size:17px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:13px;color:#9da8b5}
+input{width:100%;margin-top:5px;padding:12px 9px;border:1px solid #303a46;border-radius:10px;background:#0b0f14;color:#f3f6fa;font-size:16px}
+.toggle{display:flex;justify-content:space-between;align-items:center}.toggle input{width:26px;height:26px}
+.packhead,.packrow{display:grid;grid-template-columns:1.15fr .8fr .9fr .7fr;gap:7px}.packhead{font-size:11px;color:#9da8b5}
+button{min-height:48px;border-radius:12px;border:0;font-weight:700;font-size:16px}.primary{width:100%;background:#e8b84a;color:#17120a}.secondary{background:#202833;color:#f3f6fa;border:1px solid #303a46;padding:0 14px;margin-top:10px}
+.results{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.result{text-align:center;background:#202833;border-radius:12px;padding:13px}.result span{font-size:12px;color:#9da8b5}.result b{display:block;margin-top:5px;font-size:18px}.mid b{color:#e8b84a}
+#route{line-height:1.7;font-size:14px;margin-top:15px}.hint{font-size:12px;color:#9da8b5;line-height:1.5}.error{color:#ff7b72}
+footer{text-align:center;color:#9da8b5;font-size:11px;line-height:1.6;margin-top:20px}
+@media(max-width:520px){.results{grid-template-columns:1fr}.result{display:flex;justify-content:space-between}.result b{margin:0}.packhead,.packrow{grid-template-columns:1.15fr .8fr .9fr .7fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>しらす式 キングダム覇道<br>完凸シュミレーター</h1>
+<p class="sub">手持ち覇道石・排出率・販売パックから課金目安を計算</p>
+
+<div class="card"><h2>① 現在の状況</h2><div class="grid">
+<label>完凸まで必要な枚数<input id="need" type="number" min="0" value="10"></label>
+<label>手持ち覇道石<input id="stones" type="number" min="0" value="0"></label>
+<label>現在の登用回数<input id="progress" type="number" min="0" value="0"></label>
+<label>10連の必要覇道石<input id="tenCost" type="number" min="1" value="1400"></label>
+</div></div>
+
+<div class="card"><h2>② ガチャ設定</h2><div class="grid">
+<label>通常排出率 %<input id="normal" type="number" step=".001" value=".120"></label>
+<label>20回確定枠 %<input id="p20" type="number" step=".1" value="6"></label>
+<label>100回確定枠 %<input id="p100" type="number" step=".1" value="60"></label>
+<label>100%確定（何回ごと）<input id="pity" type="number" min="1" value="200"></label>
+</div><p class="hint">存在しない確定枠は0にしてください。</p></div>
+
+<div class="card">
+<div class="toggle"><div><h2 style="margin-bottom:3px">③ 150枚パック</h2><div class="hint">販売されている場合のみON</div></div>
+<label><input id="specialOn" type="checkbox"> 使用</label></div>
+<div id="specialFields" class="grid" style="margin-top:12px;opacity:.4">
+<label>価格<input id="specialPrice" type="number" value="15000"></label>
+<label>登用札<input id="specialTickets" type="number" value="150"></label>
+<label>付属覇道石<input id="specialStone" type="number" value="7300"></label>
+<label>購入上限<input id="specialMax" type="number" value="2"></label>
+</div></div>
+
+<div class="card"><h2>④ その他のパック</h2>
+<div class="packhead"><span>価格</span><span>札</span><span>石</span><span>上限</span></div>
+<div id="packs"></div>
+<button id="addPack" type="button" class="secondary">＋ パック追加</button></div>
+
+<button id="calc" type="button" class="primary">完凸まで計算する</button>
+
+<div class="card"><h2>計算結果</h2>
+<div class="results"><div class="result"><span>🔥 上振れ</span><b id="good">—</b></div>
+<div class="result mid"><span>🎯 平均目安</span><b id="avg">—</b></div>
+<div class="result"><span>☠️ 下振れ</span><b id="bad">—</b></div></div>
+<div id="route">条件を入力して計算してください。</div></div>
+
+<footer>しらす式 キングダム覇道 完凸シュミレーター<br>※確率上の試算です。ゲーム内の提供割合・商品内容を確認してください。</footer>
+</main>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const val=(id,min=0)=>{const x=Number($(id).value);return Number.isFinite(x)?Math.max(min,x):min};
+let packs=[
+ {price:9800,tickets:70,stones:4800,max:7},
+ {price:3000,tickets:20,stones:1400,max:4},
+ {price:160,tickets:2,stones:70,max:1}
+];
+
+function drawPacks(){
+ const box=$("packs"); box.innerHTML="";
+ packs.forEach((p,i)=>{
+   const row=document.createElement("div"); row.className="packrow";
+   row.style.marginTop="7px";
+   [["price",p.price],["tickets",p.tickets],["stones",p.stones],["max",p.max]].forEach(([key,v])=>{
+     const inp=document.createElement("input"); inp.type="number"; inp.min="0"; inp.value=v;
+     inp.addEventListener("input",()=>{packs[i][key]=Math.max(0,Number(inp.value)||0);});
+     row.appendChild(inp);
+   });
+   box.appendChild(row);
+ });
+}
+drawPacks();
+
+$("addPack").addEventListener("click",()=>{if(packs.length<10){packs.push({price:0,tickets:0,stones:0,max:1});drawPacks();}});
+$("specialOn").addEventListener("change",()=>{$("specialFields").style.opacity=$("specialOn").checked?"1":".4";});
+
+function pullsFromStones(stones){
+ const c=val("tenCost",1);
+ return Math.floor(stones/c)*10; // 10連を優先
+}
+function expectedPerPity(){
+ const pity=val("pity",1);
+ return Math.max(1,
+   pity*(val("normal")/100) +
+   Math.floor(pity/20)*(val("p20")/100) +
+   Math.floor(pity/100)*(val("p100")/100) + 1
+ );
+}
+function productList(){
+ const list=packs.filter(p=>p.price>0&&p.max>0).map(p=>({...p,max:Math.min(30,Math.floor(p.max))}));
+ if($("specialOn").checked){
+   list.unshift({price:val("specialPrice"),tickets:val("specialTickets"),stones:val("specialStone"),max:Math.min(30,Math.floor(val("specialMax")))});
+ }
+ return list;
+}
+function cheapest(target,baseStones){
+ const list=productList(); let best=null;
+ function search(i,cost,tickets,extraStones,parts){
+   if(best && cost>=best.cost) return;
+   if(tickets+pullsFromStones(baseStones+extraStones)>=target){best={cost,parts:[...parts]};return;}
+   if(i>=list.length) return;
+   const p=list[i];
+   for(let n=0;n<=p.max;n++){
+     search(i+1,cost+n*p.price,tickets+n*p.tickets,extraStones+n*p.stones,n?parts.concat(`${p.price.toLocaleString()}円×${n}`):parts);
+   }
+ }
+ search(0,0,0,0,[]);
+ return best;
+}
+function fmt(plan){return plan?plan.cost.toLocaleString()+"円":"商品上限では不足";}
+
+$("calc").addEventListener("click",()=>{
+ try{
+   const need=val("need"), stones=val("stones"), progress=val("progress"), pity=val("pity",1);
+   if(need===0){$("good").textContent=$("avg").textContent=$("bad").textContent="0円";$("route").innerHTML="<b>完凸済みです。</b>";return;}
+   const avgPulls=need*pity/expectedPerPity();
+   const targets=[0.78,1,1.30].map(m=>Math.max(0,Math.ceil((avgPulls*m-progress)/10)*10));
+   const plans=targets.map(t=>cheapest(t,stones));
+   $("good").textContent=fmt(plans[0]); $("avg").textContent=fmt(plans[1]); $("bad").textContent=fmt(plans[2]);
+   $("route").innerHTML=`平均目安：<b>約${targets[1].toLocaleString()}連</b><br>上振れ：約${targets[0].toLocaleString()}連 ／ 下振れ：約${targets[2].toLocaleString()}連<br><br>💰 最安購入候補：<b>${plans[1]?(plans[1].parts.join(" → ")||"手持ち覇道石のみ"):"登録商品の購入上限では不足"}</b><br><span class="hint">手持ち石とパック付属石も登用回数に換算しています。150枚パックが無い場合はOFFにしてください。</span>`;
+ }catch(e){$("route").innerHTML='<span class="error">計算エラーが発生しました。入力値を確認してください。</span>';}
+});
+})();
+</script>
+</body></html>
